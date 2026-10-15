@@ -664,3 +664,13 @@ Feel free to create a pull request or use the github issue tracker to report iss
 ## License
 
 This software is licensed under the Apache license. See the LICENSE and NOTICE files.
+
+## ADL 2 → ADL 1.4 down-converter (this fork)
+
+Upstream Archie converts ADL 1.4 → 2 only. This fork adds a best-effort reverse path for benchmarking against Ehrtslib — see [docs/ADL2_TO_ADL14.md](docs/ADL2_TO_ADL14.md).
+
+```bash
+./gradlew :tools:test --tests com.nedap.archie.adl14.down.ADL2ToADL14DownConverterTest
+./gradlew :tools:runADL2ToADL14 -PcliArgs="path/to/file.adls out.adl"
+```
+

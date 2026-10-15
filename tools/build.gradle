@@ -17,3 +17,17 @@ dependencies {
     api(libs.leadpony.justify)
     api(variantOf(libs.jakarta.json) { classifier("module") })
 }
+
+
+// ADL 2 → ADL 1.4 down-converter CLI (fork addition; see docs/ADL2_TO_ADL14.md)
+tasks.register('runADL2ToADL14', JavaExec) {
+    group = 'application'
+    description = 'Down-convert an ADL 2 file to ADL 1.4 text'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.nedap.archie.adl14.down.ADL2ToADL14Cli'
+    if (project.hasProperty('cliArgs')) {
+        args project.property('cliArgs').toString().split(' ')
+    } else if (project.hasProperty('args')) {
+        args project.property('args').toString().split(' ')
+    }
+}
