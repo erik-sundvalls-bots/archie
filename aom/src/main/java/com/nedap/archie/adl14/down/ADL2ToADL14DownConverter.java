@@ -102,12 +102,20 @@ public class ADL2ToADL14DownConverter {
         // Shorten HRID on the id line
         text = HRID_LINE.matcher(text).replaceAll("$1$2.v$3");
 
-        // Insert concept section after the archetype id line (before language/specialize)
+        // Insert concept AFTER specialize (ADL 1.4 order), else after archetype id.
+        // Always end the concept line with a newline so comments cannot swallow specialize.
         if (!Pattern.compile("(?m)^concept\\b").matcher(text).find()) {
-            // After first non-empty indented id line following header
-            text = text.replaceFirst(
-                    "(?m)^(\\s+\\S+\\.v\\d+\\s*)$",
-                    "$1\nconcept\n    [" + conceptCode + "]    -- " + sanitizeComment(conceptText));
+            String conceptBlock = "concept\n    [" + conceptCode + "]    -- "
+                    + sanitizeComment(conceptText) + "\n\n";
+            if (Pattern.compile("(?m)^specialize\\b").matcher(text).find()) {
+                text = text.replaceFirst(
+                        "(?m)^(specialize\n\\s+\\S+\\s*\n)",
+                        "$1\n" + Matcher.quoteReplacement(conceptBlock));
+            } else {
+                text = text.replaceFirst(
+                        "(?m)^(\\s+\\S+\\.v\\d+\\s*)$",
+                        "$1\n\n" + Matcher.quoteReplacement(conceptBlock));
+            }
         }
 
         // specialize spelling: ADL 1.4 fixtures in Archie use "specialize" already
@@ -117,6 +125,9 @@ public class ADL2ToADL14DownConverter {
 
         // Wrap each language bag under term_definitions with items = < … > when missing
         text = wrapTermDefinitionItems(text);
+
+        // Rewrite residual [idN] / idN inside definition paths (e.g. /items[id6]/value)
+        text = IdToAtCodeMapper.rewriteEmbeddedIds(text);
 
         // Drop value_sets block if serializer still emitted one
         text = text.replaceAll("(?ms)^([ \\t]*)value_sets\\s*=\\s*<.*?\n\\1>", "");
