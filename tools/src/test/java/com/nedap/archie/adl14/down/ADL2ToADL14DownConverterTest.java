@@ -64,9 +64,19 @@ public class ADL2ToADL14DownConverterTest {
 
     @Test
     public void idMapperPadsSimpleIds() {
-        assertEquals("at0001", IdToAtCodeMapper.toAtCode("id1"));
-        assertEquals("at0012", IdToAtCodeMapper.toAtCode("id12"));
-        assertEquals("at0000.1", IdToAtCodeMapper.toAtCode("id0.1"));
+        // ADL2 spec: [at0000] ([id1]), [at0001] ([id2]), [at0000.1] ([id1.1])
+        assertEquals("at0000", IdToAtCodeMapper.toAtCode("id1"));
+        assertEquals("at0001", IdToAtCodeMapper.toAtCode("id2"));
+        assertEquals("at0011", IdToAtCodeMapper.toAtCode("id12"));
+        assertEquals("at0000.1", IdToAtCodeMapper.toAtCode("id1.1"));
+        assertEquals("at0.1", IdToAtCodeMapper.toAtCode("id0.1"));
+        assertEquals("at0003", IdToAtCodeMapper.toAtCode("at4"));
+        assertEquals("at0003", IdToAtCodeMapper.toAtCode("at0003"));
+        // inverse of Archie's own ADL 1.4 → 2 converter
+        for (String old : new String[] {"at0000", "at0001", "at0011", "at0000.1", "at0004.2", "at0.1"}) {
+            String adl2 = com.nedap.archie.adl14.ADL14NodeIDConverter.convertCode(old, "id");
+            assertEquals(old, IdToAtCodeMapper.toAtCode(adl2));
+        }
         assertEquals("ac1", IdToAtCodeMapper.toAtCode("ac1"));
     }
 
@@ -82,7 +92,7 @@ public class ADL2ToADL14DownConverterTest {
         assertTrue(adl14.contains("concept"));
         assertTrue(adl14.contains("ontology"));
         assertFalse(adl14.contains("undefined[undefined]"), "must not emit undefined[undefined]");
-        assertTrue(adl14.contains("CLUSTER[at0001]"));
+        assertTrue(adl14.contains("CLUSTER[at0000]"));
         assertTrue(adl14.contains("openEHR-EHR-CLUSTER.down_probe.v1"));
 
         ADL14Parser p14 = new ADL14Parser(BuiltinReferenceModels.getMetaModelProvider());

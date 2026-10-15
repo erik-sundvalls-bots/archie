@@ -9,16 +9,19 @@ import java.util.regex.Pattern;
  */
 public final class IdToAtCodeMapper {
 
-    private static final Pattern ID_OR_AC = Pattern.compile("^(id|ac)(\\d+(?:\\.\\d+)*)$");
+    private static final Pattern ID_OR_AC = Pattern.compile("^(id|ac|at)(\\d+(?:\\.\\d+)*)$");
 
     private IdToAtCodeMapper() {}
 
     /**
-     * Convert a single code. Non-id/ac codes are returned unchanged.
+     * Convert a single code; inverse of {@link com.nedap.archie.adl14.ADL14NodeIDConverter#convertCode}.
+     * ADL2 codes are 1-based and ADL 1.4 codes 0-based (ADL2 spec: {@code [at0000]} ({@code [id1]}),
+     * {@code [at0000.1]} ({@code [id1.1]})), so the top-level segment shifts down by one.
      * <ul>
-     *   <li>{@code id1} → {@code at0001}</li>
-     *   <li>{@code id12} → {@code at0012}</li>
-     *   <li>{@code id0.1} → {@code at0000.1}</li>
+     *   <li>{@code id1} → {@code at0000}, {@code id2} → {@code at0001}</li>
+     *   <li>{@code id12} → {@code at0011}, {@code id1.1} → {@code at0000.1}</li>
+     *   <li>{@code id0.1} → {@code at0.1}</li>
+     *   <li>value codes {@code at4} → {@code at0003}; zero-padded 1.4 codes unchanged</li>
      *   <li>{@code ac1} → {@code ac1} (value-set ids kept until expanded)</li>
      * </ul>
      */
@@ -34,8 +37,13 @@ public final class IdToAtCodeMapper {
         if ("ac".equals(leader)) {
             return code; // keep ac* until value-set expansion replaces uses
         }
+        if ("at".equals(leader) && m.group(2).length() >= 4 && m.group(2).startsWith("0")) {
+            return code; // already an ADL 1.4 code
+        }
         String[] parts = m.group(2).split("\\.");
-        parts[0] = String.format("%04d", Integer.parseInt(parts[0]));
+        if (!"0".equals(parts[0])) {
+            parts[0] = String.format("%04d", Integer.parseInt(parts[0]) - 1);
+        }
         return "at" + String.join(".", parts);
     }
 
