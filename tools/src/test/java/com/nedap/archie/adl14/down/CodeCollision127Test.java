@@ -100,6 +100,23 @@ public class CodeCollision127Test {
     }
 
     @Test
+    public void specialisedNodeMovesToSameLevel() {
+        Map<String, Map<String, ArchetypeTerm>> terms = new LinkedHashMap<>();
+        Map<String, ArchetypeTerm> en = new LinkedHashMap<>();
+        en.put("id0.3", term("N3"));
+        en.put("at0.3", term("V3"));
+        en.put("id0.10", term("N10"));
+        en.put("at0.10", term("V10"));
+        terms.put("en", en);
+        Adl14CodeMap m = Adl14CodeMap.build(Arrays.asList("id1.1", "id0.10", "id0.3"),
+                Arrays.asList("at0.10", "at0.3"), terms, new ArrayList<>());
+        assertEquals("at0.3", m.get("at0.3"));
+        assertEquals("at0.9000", m.get("id0.3"));
+        assertEquals("at0.9001", m.get("id0.10"));
+        assertEquals("at0000.1", m.get("id1.1"));
+    }
+
+    @Test
     public void syntheticIdsAreDropped() {
         Map<String, Map<String, ArchetypeTerm>> terms = new LinkedHashMap<>();
         Map<String, ArchetypeTerm> en = new LinkedHashMap<>();

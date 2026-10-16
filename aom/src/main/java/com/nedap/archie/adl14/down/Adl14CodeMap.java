@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
  *   <li>Value codes keep the shifted code ({@link IdToAtCodeMapper#toAtCode}).</li>
  *   <li>A node whose shifted code equals a value code's shares it if both have identical
  *   terms in every language; otherwise the node moves to the next free {@code at9000+}
- *   code (warning). Root codes {@code id1{.1}*} never move; a value code that would take
+ *   code at the same specialisation level ({@code at0.9000+} when specialised; warning). Root codes {@code id1{.1}*} never move; a value code that would take
  *   the root code is renumbered instead.</li>
  *   <li>Synthetic node ids ({@code id9000+} without a term) are dropped ({@link #DROPPED}).</li>
  * </ol>
@@ -87,7 +87,7 @@ public final class Adl14CodeMap {
     public static Adl14CodeMap build(List<String> ids, List<String> ats,
                                      Map<String, Map<String, ArchetypeTerm>> terms,
                                      List<String> warnings) {
-        Comparator<String> byNum = Comparator.comparing((String c) -> top(c)).thenComparing(c -> c);
+        Comparator<String> byNum = Adl14CodeMap::compareCodes;
         ids = new ArrayList<>(ids);
         ats = new ArrayList<>(ats);
         ids.sort(byNum);
@@ -103,18 +103,21 @@ public final class Adl14CodeMap {
             if (ROOT.matcher(c).matches()) rootTargets.add(t);
         }
         for (String c : ats) used.add(IdToAtCodeMapper.toAtCode(c));
-        int[] next = {9000};
-        java.util.function.Supplier<String> nextFree = () -> {
-            while (used.contains("at" + next[0])) next[0]++;
-            String t = "at" + next[0]++;
-            used.add(t);
-            return t;
+        // Next unused code >= 9000 at the same specialisation level (at0003 -> at9000; at0.3 -> at0.9000)
+        java.util.function.Function<String, String> nextFree = t -> {
+            String body = t.substring(2);
+            int dot = body.lastIndexOf('.');
+            String prefix = dot < 0 ? "" : body.substring(0, dot + 1);
+            for (int n = 9000; ; n++) {
+                String c = "at" + prefix + n;
+                if (used.add(c)) return c;
+            }
         };
         Map<String, String> valueSource = new HashMap<>();
         for (String c : ats) {
             String t = IdToAtCodeMapper.toAtCode(c);
             if (rootTargets.contains(t)) {
-                t = nextFree.get();
+                t = nextFree.apply(t);
                 warnings.add("value code " + c + " would collide with the root node code; renumbered to " + t);
             }
             result.map.put(c, t);
@@ -136,7 +139,7 @@ public final class Adl14CodeMap {
                 result.map.put(c, t);
                 continue;
             }
-            String r = nextFree.get();
+            String r = nextFree.apply(t);
             result.map.put(c, r);
             warnings.add("node id " + c + " → " + t + " would collide with value code " + v
                     + " → " + t + "; node renumbered to " + r);
@@ -160,6 +163,18 @@ public final class Adl14CodeMap {
         if (c == null) return;
         if (c.matches("^id\\d.*")) ids.add(c);
         else if (c.matches("^at\\d.*") && !c.matches("^at0\\d{3}.*")) ats.add(c);
+    }
+
+    /** Segment-wise numeric order: id2 < id10, id0.2 < id0.10. */
+    static int compareCodes(String a, String b) {
+        String[] x = a.substring(2).split("\\.");
+        String[] y = b.substring(2).split("\\.");
+        for (int i = 0; i < Math.min(x.length, y.length); i++) {
+            int c = Long.compare(Long.parseLong(x[i]), Long.parseLong(y[i]));
+            if (c != 0) return c;
+        }
+        int c = Integer.compare(x.length, y.length);
+        return c != 0 ? c : a.compareTo(b);
     }
 
     private static int top(String c) {
