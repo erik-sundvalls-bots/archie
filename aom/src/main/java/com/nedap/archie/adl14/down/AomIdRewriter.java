@@ -27,12 +27,19 @@ import java.util.stream.Collectors;
 public final class AomIdRewriter {
 
     private final List<String> warnings;
+    private Adl14CodeMap codes;
+
+    /** The code map used by the last {@link #rewrite} call. */
+    public Adl14CodeMap getCodeMap() {
+        return codes;
+    }
 
     public AomIdRewriter(List<String> warnings) {
         this.warnings = warnings;
     }
 
     public void rewrite(Archetype archetype) {
+        codes = Adl14CodeMap.build(archetype, warnings);
         if (archetype.getDefinition() != null) {
             rewriteObject(archetype.getDefinition(), archetype.getTerminology());
         }
@@ -48,7 +55,7 @@ public final class AomIdRewriter {
     private void rewriteObject(CObject object, ArchetypeTerminology terminology) {
         // CPrimitiveObject always uses synthetic id9999 and rejects setNodeId.
         if (!(object instanceof CPrimitiveObject) && object.getNodeId() != null) {
-            object.setNodeId(IdToAtCodeMapper.toAtCode(object.getNodeId()));
+            object.setNodeId(codes.get(object.getNodeId()));
         }
         if (object instanceof CComplexObject) {
             CComplexObject complex = (CComplexObject) object;
@@ -85,7 +92,7 @@ public final class AomIdRewriter {
                     && terminology.getValueSets().containsKey(constraint)) {
                 ValueSet vs = terminology.getValueSets().get(constraint);
                 List<String> members = vs.getMembers().stream()
-                        .map(IdToAtCodeMapper::toAtCode)
+                        .map(codes::get)
                         .collect(Collectors.toList());
                 if (members.isEmpty()) {
                     warnings.add("Value set " + constraint + " has no members; left as ac-code.");
@@ -94,7 +101,7 @@ public final class AomIdRewriter {
                     rewritten.add("local::" + String.join(", ", members));
                 }
             } else if (constraint.startsWith("id") || constraint.startsWith("at")) {
-                rewritten.add(IdToAtCodeMapper.toAtCode(constraint));
+                rewritten.add(codes.get(constraint));
             } else {
                 rewritten.add(constraint);
             }
@@ -104,14 +111,15 @@ public final class AomIdRewriter {
 
     private void rewriteTerminology(ArchetypeTerminology terminology) {
         if (terminology.getConceptCode() != null) {
-            terminology.setConceptCode(IdToAtCodeMapper.toAtCode(terminology.getConceptCode()));
+            terminology.setConceptCode(codes.get(terminology.getConceptCode()));
         }
 
         Map<String, Map<String, ArchetypeTerm>> newDefs = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, ArchetypeTerm>> langEntry : terminology.getTermDefinitions().entrySet()) {
             Map<String, ArchetypeTerm> newLang = new LinkedHashMap<>();
             for (Map.Entry<String, ArchetypeTerm> codeEntry : langEntry.getValue().entrySet()) {
-                newLang.put(IdToAtCodeMapper.toAtCode(codeEntry.getKey()), codeEntry.getValue());
+                String code14 = codes.get(codeEntry.getKey());
+                if (!Adl14CodeMap.DROPPED.equals(code14)) newLang.put(code14, codeEntry.getValue());
             }
             newDefs.put(langEntry.getKey(), newLang);
         }
@@ -122,7 +130,7 @@ public final class AomIdRewriter {
             for (Map.Entry<String, Map<String, URI>> byTerminologiy : terminology.getTermBindings().entrySet()) {
                 Map<String, URI> newInner = new LinkedHashMap<>();
                 for (Map.Entry<String, URI> e : byTerminologiy.getValue().entrySet()) {
-                    newInner.put(IdToAtCodeMapper.toAtCode(e.getKey()), e.getValue());
+                    newInner.put(codes.get(e.getKey()), e.getValue());
                 }
                 newBindings.put(byTerminologiy.getKey(), newInner);
             }
