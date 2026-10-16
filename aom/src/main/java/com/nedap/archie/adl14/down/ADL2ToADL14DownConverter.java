@@ -42,12 +42,14 @@ public class ADL2ToADL14DownConverter {
                             + "(missing rm_type_name/node_id).");
         }
 
-        new AomIdRewriter(warnings).rewrite(archetype);
+        AomIdRewriter rewriter = new AomIdRewriter(warnings);
+        rewriter.rewrite(archetype);
+        Adl14CodeMap codes = rewriter.getCodeMap();
 
         String adl2 = ADLArchetypeSerializer.serialize(archetype);
         String conceptCode = conceptCodeOf(archetype);
         String conceptText = conceptTextOf(archetype, conceptCode);
-        String adl14 = toAdl14Text(adl2, conceptCode, conceptText, archetype, warnings);
+        String adl14 = toAdl14Text(adl2, conceptCode, conceptText, archetype, warnings, codes);
         String id14 = archetypeId14(archetype);
         return new ADL14DownConversionResult(adl14, id14, warnings);
     }
@@ -86,6 +88,11 @@ public class ADL2ToADL14DownConverter {
 
     static String toAdl14Text(String adl2, String conceptCode, String conceptText,
                               Archetype archetype, List<String> warnings) {
+        return toAdl14Text(adl2, conceptCode, conceptText, archetype, warnings, null);
+    }
+
+    static String toAdl14Text(String adl2, String conceptCode, String conceptText,
+                              Archetype archetype, List<String> warnings, Adl14CodeMap codes) {
         String text = adl2;
 
         // Header: force adl_version=1.4; keep rm_release if present; mark generated
@@ -127,7 +134,19 @@ public class ADL2ToADL14DownConverter {
         text = wrapTermDefinitionItems(text);
 
         // Rewrite residual [idN] / idN inside definition paths (e.g. /items[id6]/value)
-        text = IdToAtCodeMapper.rewriteEmbeddedIds(text);
+        if (codes != null) {
+            Matcher ids = Pattern.compile("\\bid(\\d+(?:\\.\\d+)*)\\b").matcher(text);
+            StringBuffer sb = new StringBuffer();
+            while (ids.find()) {
+                ids.appendReplacement(sb, Matcher.quoteReplacement(codes.get("id" + ids.group(1))));
+            }
+            ids.appendTail(sb);
+            text = sb.toString();
+        } else {
+            text = IdToAtCodeMapper.rewriteEmbeddedIds(text);
+        }
+        // Dropped synthetic node ids: TYPE[] → TYPE (ADL 1.4 needs no id there)
+        text = text.replaceAll("(?<=[\\w>])\\[\\]", "");
 
         // Drop value_sets block if serializer still emitted one
         text = text.replaceAll("(?ms)^([ \\t]*)value_sets\\s*=\\s*<.*?\n\\1>", "");
